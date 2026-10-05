@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="id">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/leaflet-measure.css">
+        <style>
+        :root {
+            --bg: #f5f6f4;
+            --panel: #ffffff;
+            --ink: #1f2a2e;
+            --muted: #5f6b70;
+            --line: #e1e5e3;
+            --accent: #0f5c4c;
+            --accent-soft: #e3f0ec;
+            --tambang: #d7301f;
+            --referensi: #2166ac;
+            --benar: #1b9e77;
+            --salah: #d95f02;
+            --terlewat: #7570b3;
+        }
+        * { box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+            font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 14px; }
+        #app { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: flex; overflow: clip; }
+        #panel { width: 370px; flex: 0 0 370px; height: 100%; overflow-y: auto; background: var(--panel);
+            border-right: 1px solid var(--line); box-shadow: 2px 0 12px rgba(0,0,0,.06); z-index: 1001; }
+        #map { flex: 1 1 auto; height: 100%; }
+
+        .p-head { padding: 20px 20px 16px; background: var(--accent); color: #fff; }
+        .p-head .eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; opacity: .8; }
+        .p-head h1 { margin: 6px 0 6px; font-size: 19px; line-height: 1.3; font-weight: 650; }
+        .p-head p { margin: 0; font-size: 12.5px; opacity: .88; line-height: 1.45; }
+
+        .sec { padding: 16px 20px; border-bottom: 1px solid var(--line); }
+        .sec h2 { margin: 0 0 10px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+
+        .filter-row { display: flex; gap: 8px; }
+        select { flex: 1; padding: 9px 10px; border: 1px solid #c9d1ce; border-radius: 8px; font: inherit; background: #fff; color: var(--ink); }
+        select:focus, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .btn { padding: 9px 12px; border: 1px solid #c9d1ce; border-radius: 8px; background: #fff; font: inherit; cursor: pointer; color: var(--ink); }
+        .btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+        .scope { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+        .scope b { color: var(--ink); }
+
+        .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; background: #fbfcfb; }
+        .kpi .lbl { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+        .kpi .val { font-size: 22px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .kpi .val small { font-size: 12px; font-weight: 500; color: var(--muted); }
+        .kpi .sub { font-size: 12px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+        .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: 0 0 auto; }
+
+        .stack { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #eef1ef; margin: 4px 0 10px; }
+        .stack span { display: block; height: 100%; }
+        .legend-rows { display: grid; gap: 6px; }
+        .legend-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .legend-row .n { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+        .bars { display: grid; gap: 10px; }
+        .bar-item { cursor: pointer; border-radius: 8px; padding: 6px 8px; margin: 0 -8px; }
+        .bar-item:hover, .bar-item.active { background: var(--accent-soft); }
+        .bar-top { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+        .bar-top .v { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+        .bar-track { height: 9px; background: #eef1ef; border-radius: 5px; overflow: hidden; margin-bottom: 3px; }
+        .bar-fill { height: 100%; border-radius: 5px; }
+        .bar-note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+        .bar-key { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+        .bar-key span { display: inline-flex; align-items: center; gap: 6px; }
+
+        .layer { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; font-size: 13.5px; }
+        .layer input { margin-top: 2px; accent-color: var(--accent); }
+        .layer .sw { display: inline-flex; gap: 3px; margin-left: auto; padding-top: 3px; }
+        .layer .hint { display: block; font-size: 12px; color: var(--muted); }
+        .opacity { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); padding: 4px 0 2px 24px; }
+        .opacity input { flex: 1; accent-color: var(--accent); }
+        .basemaps { display: flex; gap: 8px; margin-top: 6px; }
+        .basemaps label { flex: 1; text-align: center; border: 1px solid #c9d1ce; border-radius: 8px; padding: 8px 6px; cursor: pointer; font-size: 13px; }
+        .basemaps input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; margin: 0; }
+        .basemaps label { position: relative; }
+        .basemaps label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .basemaps label.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+        .note { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+        .note p { margin: 0 0 8px; }
+        .foot { padding: 14px 20px 22px; font-size: 11.5px; color: var(--muted); }
+
+        #panelToggle { display: none; }
+
+        .leaflet-popup-content table { border-collapse: collapse; font-size: 12.5px; }
+        .leaflet-popup-content th { text-align: left; padding: 3px 10px 3px 0; color: var(--muted); font-weight: 500; }
+        .leaflet-popup-content td { padding: 3px 0; font-weight: 600; }
+
+        @media (max-width: 760px) {
+            #panel { position: absolute; left: 0; top: 0; bottom: 0; width: min(88vw, 370px); transform: translateX(-100%); transition: transform .25s ease; }
+            #app.open #panel { transform: none; }
+            #panelToggle { display: block; position: absolute; z-index: 1002; top: 12px; left: 12px; border: 0; border-radius: 8px;
+                background: var(--accent); color: #fff; padding: 9px 12px; font: inherit; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+            #app.open #panelToggle { left: calc(min(88vw, 370px) + 10px); }
+            .leaflet-top.leaflet-left { top: 52px; }
+        }
+        </style>
+        <title>Sebaran Lahan Tambang Nikel Kabupaten Halmahera Tengah, 2024</title>
+    </head>
+    <body>
+        <div id="app">
+            <aside id="panel" aria-label="Panel informasi dan penapis">
+                <div class="p-head">
+                    <div class="eyebrow">WebGIS hasil pemetaan</div>
+                    <h1>Sebaran Lahan Tambang Nikel Kabupaten Halmahera Tengah, 2024</h1>
+                    <p>Klasifikasi <i>Multi-Layer Perceptron</i> pada citra Sentinel-2 komposit Mei–September 2024, unit analisis sel grid 0,5 km × 0,5 km.</p>
+                </div>
+
+                <section class="sec">
+                    <h2>Penapis wilayah</h2>
+                    <div class="filter-row">
+                        <select id="kecSelect" aria-label="Pilih kecamatan"></select>
+                        <button class="btn" id="resetBtn" title="Tampilkan seluruh kabupaten"><i class="fas fa-undo"></i></button>
+                    </div>
+                    <div class="scope" id="scopeText"></div>
+                </section>
+
+                <section class="sec">
+                    <h2>Ringkasan luas</h2>
+                    <div class="kpis">
+                        <div class="kpi">
+                            <div class="lbl"><span class="dot" style="background:var(--tambang)"></span>Luas peta</div>
+                            <div class="val" id="kLuasPeta">–</div>
+                            <div class="sub" id="kSelPeta">–</div>
+                        </div>
+                        <div class="kpi">
+                            <div class="lbl"><span class="dot" style="background:var(--referensi)"></span>Luas referensi</div>
+                            <div class="val" id="kLuasRef">–</div>
+                            <div class="sub" id="kSelRef">–</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="sec">
+                    <h2>Kesesuaian dengan label</h2>
+                    <div class="stack" id="stackBar"></div>
+                    <div class="legend-rows">
+                        <div class="legend-row"><span class="dot" style="background:var(--benar)"></span>Benar tambang<span class="n" id="nBenar">–</span></div>
+                        <div class="legend-row"><span class="dot" style="background:var(--salah)"></span>Salah tandai (positif palsu)<span class="n" id="nSalah">–</span></div>
+                        <div class="legend-row"><span class="dot" style="background:var(--terlewat)"></span>Terlewat (negatif palsu)<span class="n" id="nTerlewat">–</span></div>
+                    </div>
+                </section>
+
+                <section class="sec">
+                    <h2>Luas tambang per kecamatan</h2>
+                    <div class="bar-key">
+                        <span><span class="dot" style="background:var(--tambang)"></span>Luas peta</span>
+                        <span><span class="dot" style="background:var(--referensi)"></span>Luas referensi</span>
+                    </div>
+                    <div class="bars" id="bars"></div>
+                    <div class="bar-note" id="barNote"></div>
+                </section>
+
+                <section class="sec">
+                    <h2>Lapisan peta</h2>
+                    <label class="layer"><input type="checkbox" id="lyGrid" checked>
+                        <span>Sel grid hasil klasifikasi<span class="hint">Merah = tambang, abu-abu = non-tambang</span></span>
+                        <span class="sw"><span class="dot" style="background:var(--tambang)"></span><span class="dot" style="background:#c8c8c8"></span></span></label>
+                    <div class="opacity"><span>Transparansi</span><input type="range" id="gridOpacity" min="20" max="100" value="100" aria-label="Transparansi sel grid"></div>
+                    <label class="layer"><input type="checkbox" id="lyNon" checked>
+                        <span>Tampilkan sel non-tambang</span></label>
+                    <label class="layer"><input type="checkbox" id="lyKes">
+                        <span>Kesesuaian dengan label<span class="hint">Benar tambang, salah tandai, terlewat</span></span>
+                        <span class="sw"><span class="dot" style="background:var(--benar)"></span><span class="dot" style="background:var(--salah)"></span><span class="dot" style="background:var(--terlewat)"></span></span></label>
+                    <label class="layer"><input type="checkbox" id="lyRef">
+                        <span>Label referensi (118 sel)<span class="hint">Garis biru = sel berlabel tambang</span></span>
+                        <span class="sw"><span class="dot" style="background:transparent;border:2px solid var(--referensi)"></span></span></label>
+                    <label class="layer"><input type="checkbox" id="lyBatas" checked>
+                        <span>Batas kecamatan</span>
+                        <span class="sw"><span class="dot" style="background:transparent;border:2px solid #3c3c3c;height:2px;margin-top:4px"></span></span></label>
+                    <label class="layer"><input type="checkbox" id="lyKec">
+                        <span>Luas tambang per kecamatan<span class="hint">Klik poligon kecamatan untuk melihat rinciannya</span></span></label>
+                    <h2 style="margin-top:12px">Peta dasar</h2>
+                    <div class="basemaps" id="basemaps">
+                        <label class="on"><input type="radio" name="bm" value="esri" checked>Citra satelit</label>
+                        <label><input type="radio" name="bm" value="osm">OpenStreetMap</label>
+                    </div>
+                </section>
+
+                <section class="sec note">
+                    <h2>Catatan</h2>
+                    <p>Luas dihitung pada tingkat sel (1 sel = 25 ha). Sebuah sel diberi label tambang apabila bukaan di dalamnya mencapai 25 persen luas sel, sehingga angka ini bukan luas bukaan fisik.</p>
+                    <p>Klik sebuah sel untuk melihat ID sel, kecamatan, kelas prediksi, skor model, kesesuaian dengan label, dan fraksi bukaan.</p>
+                </section>
+                <div class="foot">Sumber: citra Sentinel-2 (Google Earth Engine), batas kecamatan Badan Informasi Geospasial; diolah penulis. Disusun dengan QGIS dan qgis2web.</div>
+            </aside>
+            <button id="panelToggle" aria-controls="panel"><i class="fas fa-bars"></i> Panel</button>
+            <div id="map"></div>
+        </div>
+        <script src="js/leaflet.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/leaflet-measure.js"></script>
+        <script src="data/Selgridhasilklasifikasi_2.js"></script>
+        <script src="data/Kesesuaiandenganlabel_3.js"></script>
+        <script src="data/Labelreferensi118sel_4.js"></script>
+        <script src="data/Bataskecamatan_5.js"></script>
+        <script src="data/Luastambangperkecamatanklikpoligon_6.js"></script>
+        <script>
+        var CELL_HA = 25;
+        var fmt = function (n) { return Number(n).toLocaleString('id-ID'); };
+
+        function highlightFeature(e) {
+            var l = e.target;
+            if (l.feature.geometry.type === 'LineString' || l.feature.geometry.type === 'MultiLineString') {
+                l.setStyle({ color: 'rgba(255, 255, 0, 1.00)' });
+            } else {
+                l.setStyle({ fillColor: 'rgba(255, 230, 0, 1.00)', fillOpacity: 1 });
+            }
+        }
+        function resetHighlight(e) {
+            for (var i in e.target._eventParents) {
+                if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                    e.target._eventParents[i].resetStyle(e.target);
+                }
+            }
+        }
+        function popupTable(rows, p) {
+            var html = '<table>';
+            rows.forEach(function (r) {
+                var v = p[r[1]];
+                if (v === null || v === undefined || v === '') return;
+                if (r[2]) v = r[2](v);
+                html += '<tr><th scope="row">' + r[0] + '</th><td>' + v + '</td></tr>';
+            });
+            return html + '</table>';
+        }
+        var dec3 = function (v) { return Number(v).toLocaleString('id-ID', { maximumFractionDigits: 3 }); };
+        var dec1 = function (v) { return Number(v).toLocaleString('id-ID', { maximumFractionDigits: 1 }); };
+
+        var map = L.map('map', { zoomControl: false, maxZoom: 18, minZoom: 6 });
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/qgis2web/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        L.control.zoom({ position: 'topleft' }).addTo(map);
+        var measureControl = new L.Control.Measure({
+            position: 'topleft',
+            primaryLengthUnit: 'kilometers',
+            secondaryLengthUnit: 'meters',
+            primaryAreaUnit: 'hectares',
+            secondaryAreaUnit: 'sqmeters'
+        });
+        measureControl.addTo(map);
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].innerHTML = '';
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].className += ' fas fa-ruler';
+        L.control.scale({ position: 'bottomright', metric: true, imperial: false }).addTo(map);
+
+        // ---------- peta dasar ----------
+        map.createPane('pane_basemap');
+        map.getPane('pane_basemap').style.zIndex = 400;
+        var basemaps = {
+            esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                pane: 'pane_basemap', minZoom: 6, maxZoom: 18, maxNativeZoom: 19, attribution: 'Citra: Esri'
+            }),
+            osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                pane: 'pane_basemap', minZoom: 6, maxZoom: 18, maxNativeZoom: 19, attribution: '&copy; OpenStreetMap'
+            })
+        };
+        var currentBase = basemaps.esri.addTo(map);
+
+        // ---------- sel grid hasil klasifikasi ----------
+        var showNon = true;
+        function style_grid(feature) {
+            if (feature.properties['kelas_acak'] === 'Tambang') {
+                return { pane: 'pane_grid', opacity: 1, color: 'rgba(165,15,21,1.0)', weight: 1.0, fill: true, fillOpacity: 1, fillColor: 'rgba(215,48,31,0.9)' };
+            }
+            if (!showNon) return { pane: 'pane_grid', stroke: false, fill: false };
+            return { pane: 'pane_grid', stroke: false, fill: true, fillOpacity: 1, fillColor: 'rgba(150,150,150,0.27)' };
+        }
+        function pop_grid(feature, layer) {
+            layer.on({ mouseout: resetHighlight, mouseover: function (e) {
+                if (!showNon && feature.properties['kelas_acak'] !== 'Tambang') return;
+                highlightFeature(e);
+            } });
+            layer.bindPopup(function () {
+                return popupTable([
+                    ['ID sel', 'id_sel'], ['Kecamatan', 'Kecamatan'], ['Kelas prediksi', 'kelas_acak'], ['Skor model', 'skor_acak', dec3],
+                    ['Kesesuaian dengan label', 'kesesuaian_acak'], ['Label referensi', 'label_referensi'],
+                    ['Fraksi bukaan (%)', 'fraksi_bukaan', dec1], ['Luas sel (ha)', 'luas_sel_ha']
+                ], feature.properties);
+            }, { maxHeight: 400 });
+        }
+        map.createPane('pane_grid');
+        map.getPane('pane_grid').style.zIndex = 402;
+        var layer_grid = L.geoJson(null, { pane: 'pane_grid', onEachFeature: pop_grid, style: style_grid });
+
+        // ---------- kesesuaian dengan label ----------
+        var KES_COLORS = {
+            'Benar tambang': ['rgba(10,90,65,1)', 'rgba(27,158,119,0.92)'],
+            'Salah tandai': ['rgba(140,55,0,1)', 'rgba(217,95,2,0.92)'],
+            'Terlewat': ['rgba(60,55,120,1)', 'rgba(117,112,179,0.92)']
+        };
+        function style_kes(feature) {
+            var c = KES_COLORS[feature.properties['kesesuaian_acak']] || ['#555', '#999'];
+            return { pane: 'pane_kes', opacity: 1, color: c[0], weight: 1.0, fill: true, fillOpacity: 1, fillColor: c[1] };
+        }
+        function pop_kes(feature, layer) {
+            layer.on({ mouseout: resetHighlight, mouseover: highlightFeature });
+            layer.bindPopup(function () {
+                return popupTable([
+                    ['ID sel', 'id_sel'], ['Kecamatan', 'Kecamatan'], ['Kesesuaian dengan label', 'kesesuaian_acak'],
+                    ['Skor model', 'skor_acak', dec3], ['Label referensi', 'label_referensi'], ['Fraksi bukaan (%)', 'fraksi_bukaan', dec1]
+                ], feature.properties);
+            }, { maxHeight: 400 });
+        }
+        map.createPane('pane_kes');
+        map.getPane('pane_kes').style.zIndex = 403;
+        var layer_kes = L.geoJson(null, { pane: 'pane_kes', onEachFeature: pop_kes, style: style_kes });
+
+        // ---------- label referensi ----------
+        function pop_ref(feature, layer) {
+            layer.on({ mouseout: resetHighlight, mouseover: highlightFeature });
+            layer.bindPopup(function () {
+                return popupTable([
+                    ['ID sel', 'id_sel'], ['Kecamatan', 'Kecamatan'], ['Fraksi bukaan (%)', 'fraksi_bukaan', dec1], ['Luas sel (ha)', 'luas_sel_ha']
+                ], feature.properties);
+            }, { maxHeight: 400 });
+        }
+        map.createPane('pane_ref');
+        map.getPane('pane_ref').style.zIndex = 404;
+        var layer_ref = L.geoJson(null, {
+            pane: 'pane_ref', onEachFeature: pop_ref,
+            style: function () { return { pane: 'pane_ref', opacity: 1, color: 'rgba(33,102,172,1.0)', weight: 2.0, fill: true, fillOpacity: 1, fillColor: 'rgba(0,0,0,0.0)' }; }
+        });
+
+        // ---------- batas kecamatan ----------
+        map.createPane('pane_batas');
+        map.getPane('pane_batas').style.zIndex = 405;
+        var layer_batas = L.geoJson(json_Bataskecamatan_5, {
+            pane: 'pane_batas', interactive: false,
+            style: function () { return { pane: 'pane_batas', opacity: 1, color: 'rgba(60,60,60,1.0)', lineCap: 'square', lineJoin: 'bevel', weight: 2.0, fillOpacity: 0 }; }
+        });
+
+        // ---------- luas tambang per kecamatan ----------
+        function pop_kec(feature, layer) {
+            layer.on({ mouseout: resetHighlight, mouseover: highlightFeature });
+            layer.bindPopup(function () {
+                return popupTable([
+                    ['Kecamatan', 'Kecamatan'], ['Jumlah sel', 'jumlah_sel', fmt], ['Sel diprediksi tambang', 'sel_tambang_acak', fmt],
+                    ['Luas peta (ha)', 'luas_tambang_acak_ha', fmt], ['Sel berlabel tambang', 'sel_referensi', fmt], ['Luas referensi (ha)', 'luas_referensi_ha', fmt]
+                ], feature.properties);
+            }, { maxHeight: 400 });
+        }
+        map.createPane('pane_kec');
+        map.getPane('pane_kec').style.zIndex = 406;
+        var layer_kec = L.geoJson(json_Luastambangperkecamatanklikpoligon_6, {
+            pane: 'pane_kec', onEachFeature: pop_kec,
+            style: function () { return { pane: 'pane_kec', opacity: 1, color: 'rgba(40,40,40,1.0)', weight: 2.0, fill: true, fillOpacity: 1, fillColor: 'rgba(255,255,255,0.004)' }; }
+        });
+
+        // ---------- sorotan kecamatan terpilih ----------
+        map.createPane('pane_sorot');
+        map.getPane('pane_sorot').style.zIndex = 407;
+        map.getPane('pane_sorot').style.pointerEvents = 'none';
+        var layer_sorot = L.geoJson(null, {
+            pane: 'pane_sorot', interactive: false,
+            style: function () { return { pane: 'pane_sorot', color: '#ffd400', weight: 3.5, dashArray: '8 5', fill: false }; }
+        }).addTo(map);
+
+        var fullBounds = L.geoJson(json_Luastambangperkecamatanklikpoligon_6).getBounds();
+
+        // ---------- penapis kecamatan ----------
+        var KEC = json_Luastambangperkecamatanklikpoligon_6.features.map(function (f) { return f.properties; })
+            .sort(function (a, b) { return a.Kecamatan.localeCompare(b.Kecamatan); });
+        var sel = document.getElementById('kecSelect');
+        sel.innerHTML = '<option value="">Seluruh kabupaten (10 kecamatan)</option>' +
+            KEC.map(function (k) {
+                var n = Number(k.sel_tambang_acak);
+                return '<option value="' + k.Kecamatan + '">' + k.Kecamatan + (n ? ' — ' + n + ' sel tambang' : '') + '</option>';
+            }).join('');
+
+        var current = '';
+        function inScope(f) { return !current || f.properties.Kecamatan === current; }
+        function subset(json) { return { type: 'FeatureCollection', features: json.features.filter(inScope) }; }
+
+        function applyFilter(kec, fit) {
+            current = kec || '';
+            sel.value = current;
+            layer_grid.clearLayers().addData(subset(json_Selgridhasilklasifikasi_2));
+            layer_kes.clearLayers().addData(subset(json_Kesesuaiandenganlabel_3));
+            layer_ref.clearLayers().addData(subset(json_Labelreferensi118sel_4));
+            layer_sorot.clearLayers();
+            if (current) {
+                var f = json_Luastambangperkecamatanklikpoligon_6.features.filter(function (x) { return x.properties.Kecamatan === current; });
+                layer_sorot.addData({ type: 'FeatureCollection', features: f });
+                if (fit !== false) map.fitBounds(layer_sorot.getBounds(), { padding: [20, 20] });
+            } else if (fit !== false) {
+                map.fitBounds(fullBounds);
+            }
+            updateStats();
+        }
+
+        function updateStats() {
+            var cells = json_Selgridhasilklasifikasi_2.features.filter(inScope);
+            var nPeta = 0, nRef = 0, k = { 'Benar tambang': 0, 'Salah tandai': 0, 'Terlewat': 0 };
+            cells.forEach(function (f) {
+                var p = f.properties;
+                if (p.kelas_acak === 'Tambang') nPeta++;
+                if (p.label_referensi === 'Tambang') nRef++;
+                if (k.hasOwnProperty(p.kesesuaian_acak)) k[p.kesesuaian_acak]++;
+            });
+            document.getElementById('kLuasPeta').innerHTML = fmt(nPeta * CELL_HA) + ' <small>ha</small>';
+            document.getElementById('kSelPeta').textContent = fmt(nPeta) + ' sel diprediksi tambang';
+            document.getElementById('kLuasRef').innerHTML = fmt(nRef * CELL_HA) + ' <small>ha</small>';
+            document.getElementById('kSelRef').textContent = fmt(nRef) + ' sel berlabel tambang';
+            document.getElementById('nBenar').textContent = fmt(k['Benar tambang']) + ' sel';
+            document.getElementById('nSalah').textContent = fmt(k['Salah tandai']) + ' sel';
+            document.getElementById('nTerlewat').textContent = fmt(k['Terlewat']) + ' sel';
+            var tot = k['Benar tambang'] + k['Salah tandai'] + k['Terlewat'];
+            document.getElementById('stackBar').innerHTML = tot ? [
+                ['Benar tambang', 'var(--benar)'], ['Salah tandai', 'var(--salah)'], ['Terlewat', 'var(--terlewat)']
+            ].map(function (c) { return '<span title="' + c[0] + ': ' + k[c[0]] + ' sel" style="width:' + (k[c[0]] / tot * 100) + '%;background:' + c[1] + '"></span>'; }).join('') : '';
+            document.getElementById('scopeText').innerHTML = current
+                ? 'Menampilkan <b>Kecamatan ' + current + '</b> (' + fmt(cells.length) + ' sel). Peta diperbesar ke wilayah ini.'
+                : 'Menampilkan <b>seluruh Kabupaten Halmahera Tengah</b> (' + fmt(cells.length) + ' sel).';
+            document.querySelectorAll('.bar-item').forEach(function (el) { el.classList.toggle('active', el.dataset.kec === current); });
+        }
+
+        // ---------- grafik batang per kecamatan ----------
+        (function () {
+            var withMine = KEC.filter(function (k) { return Number(k.luas_tambang_acak_ha) > 0 || Number(k.luas_referensi_ha) > 0; })
+                .sort(function (a, b) { return b.luas_tambang_acak_ha - a.luas_tambang_acak_ha; });
+            var max = Math.max.apply(null, withMine.map(function (k) { return Math.max(k.luas_tambang_acak_ha, k.luas_referensi_ha); }));
+            document.getElementById('bars').innerHTML = withMine.map(function (k) {
+                var a = Number(k.luas_tambang_acak_ha), r = Number(k.luas_referensi_ha);
+                return '<div class="bar-item" data-kec="' + k.Kecamatan + '" title="Klik untuk menapis ke kecamatan ini">' +
+                    '<div class="bar-top"><span>' + k.Kecamatan + '</span><span class="v">' + fmt(a) + ' / ' + fmt(r) + ' ha</span></div>' +
+                    '<div class="bar-track"><div class="bar-fill" style="width:' + (a / max * 100) + '%;background:var(--tambang)"></div></div>' +
+                    '<div class="bar-track"><div class="bar-fill" style="width:' + (r / max * 100) + '%;background:var(--referensi)"></div></div></div>';
+            }).join('');
+            var none = KEC.length - withMine.length;
+            document.getElementById('barNote').textContent = none + ' kecamatan lainnya tidak memuat sel tambang, baik pada peta maupun label. Klik nama kecamatan untuk menapis peta.';
+            document.querySelectorAll('.bar-item').forEach(function (el) {
+                el.addEventListener('click', function () { applyFilter(el.dataset.kec === current ? '' : el.dataset.kec); });
+            });
+        })();
+
+        sel.addEventListener('change', function () { applyFilter(sel.value); });
+        document.getElementById('resetBtn').addEventListener('click', function () { applyFilter(''); });
+
+        // ---------- kendali lapisan ----------
+        function bindLayer(id, layer) {
+            var cb = document.getElementById(id);
+            var sync = function () { if (cb.checked) map.addLayer(layer); else map.removeLayer(layer); };
+            cb.addEventListener('change', sync); sync();
+        }
+        bindLayer('lyGrid', layer_grid);
+        bindLayer('lyKes', layer_kes);
+        bindLayer('lyRef', layer_ref);
+        bindLayer('lyBatas', layer_batas);
+        bindLayer('lyKec', layer_kec);
+        document.getElementById('gridOpacity').addEventListener('input', function (e) {
+            map.getPane('pane_grid').style.opacity = e.target.value / 100;
+        });
+        document.getElementById('lyNon').addEventListener('change', function (e) {
+            showNon = e.target.checked;
+            layer_grid.setStyle(style_grid);
+        });
+        document.querySelectorAll('#basemaps input').forEach(function (r) {
+            r.addEventListener('change', function () {
+                map.removeLayer(currentBase);
+                currentBase = basemaps[r.value].addTo(map);
+                document.querySelectorAll('#basemaps label').forEach(function (l) { l.classList.toggle('on', l.contains(r)); });
+            });
+        });
+
+        // ---------- cegah tata letak bergeser ----------
+        function pinLayout() {
+            var a = document.getElementById('app');
+            a.scrollTop = 0; a.scrollLeft = 0;
+            document.documentElement.scrollTop = 0; document.body.scrollTop = 0;
+        }
+        ['scroll', 'focusin', 'change', 'click'].forEach(function (ev) {
+            document.getElementById('app').addEventListener(ev, function () { setTimeout(pinLayout, 0); }, true);
+        });
+        window.addEventListener('scroll', pinLayout);
+
+        // ---------- panel pada layar kecil ----------
+        document.getElementById('panelToggle').addEventListener('click', function () {
+            document.getElementById('app').classList.toggle('open');
+        });
+
+        // ---------- kunci tampilan pada Kabupaten Halmahera Tengah ----------
+        var focusBounds = fullBounds.pad(0.25);
+        map.options.maxBoundsViscosity = 1.0;
+        map.setMaxBounds(focusBounds);
+        function lockZoom() {
+            map.invalidateSize();
+            map.setMinZoom(Math.max(6, Math.floor(map.getBoundsZoom(focusBounds))));
+        }
+        lockZoom();
+        window.addEventListener('resize', lockZoom);
+        window.addEventListener('orientationchange', function () { setTimeout(lockZoom, 300); });
+        window.addEventListener('load', function () { setTimeout(lockZoom, 200); });
+
+        var hasHash = /^#\d+\//.test(location.hash);
+        applyFilter('', !hasHash);
+        if (!hasHash) map.fitBounds(fullBounds);
+        </script>
+    </body>
+</html>
